@@ -2,7 +2,7 @@ name: Sync Fork
 
 on:
   schedule:
-    - cron: "0 */6 * * *" 
+    - cron: "0 */6 * * *"
   workflow_dispatch:
 
 jobs:
@@ -14,20 +14,39 @@ jobs:
         uses: actions/checkout@v4
         with:
           token: ${{ secrets.ANU_TOKEN }}
+          fetch-depth: 0
+
+      - name: Backup custom files
+        run: |
+          mkdir backup
+          cp vercel.json backup/ 2>/dev/null || true
+          cp .github/workflows/sync.yml backup/ 2>/dev/null || true
 
       - name: Add upstream
         run: |
-          git remote add upstream https://github.com/m-lab/mlab-speedtest.git
+          git remote add upstream https://github.com/m-lab/mlab-speedtest.git || true
           git fetch upstream
 
       - name: Merge upstream
         run: |
-          git merge upstream/main --allow-unrelated-histories || true
+          git merge upstream/main --allow-unrelated-histories -X theirs || true
 
-      - name: Restore vercel config
+      - name: Restore custom files
         run: |
-          git checkout HEAD -- vercel.json || true
+          cp backup/vercel.json vercel.json 2>/dev/null || true
+          mkdir -p .github/workflows
+          cp backup/sync.yml .github/workflows/sync.yml 2>/dev/null || true
 
-      - name: Push changes
+      - name: Remove upstream workflows you don't want
+        run: |
+          rm -f .github/workflows/firebase*
+          rm -f .github/workflows/pages*
+
+      - name: Commit changes
+        run: |
+          git add .
+          git commit -m "sync upstream + keep custom config" || true
+
+      - name: Push
         run: |
           git push origin main
